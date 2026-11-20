@@ -1,0 +1,44 @@
+### All students through the gateway
+GET http://localhost:8085/api/students
+
+### One student
+GET http://localhost:8085/api/students/1
+
+### Student with profile (student-service calls student-profile-service through Feign)
+GET http://localhost:8085/api/students/1/full
+
+### All profiles
+GET http://localhost:8085/api/profiles
+
+### Profile for student 1
+GET http://localhost:8085/api/profiles/student/1
+
+### Create a student
+POST http://localhost:8085/api/students
+Content-Type: application/json
+
+{
+  "firstName": "Nina",
+  "lastName": "Brown",
+  "email": "nina.brown@example.com"
+}
+
+### Create a profile for the new student
+POST http://localhost:8085/api/profiles
+Content-Type: application/json
+
+{
+  "studentId": 4,
+  "major": "Data Science",
+  "gpa": 3.85,
+  "bio": "Enjoys analytics and cloud development."
+}
+
+### Full record for the new student
+GET http://localhost:8085/api/students/4/full
+
+### Direct calls that bypass the gateway (optional)
+GET http://localhost:8081/api/students
+
+###
+GET http://localhost:8082/api/profiles

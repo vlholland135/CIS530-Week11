@@ -1,0 +1,104 @@
+# Starts the full Week 11 stack: Eureka, two MySQL databases, both microservices, and the API Gateway.
+# Build the JARs first from this folder:  .\mvnw.cmd clean package -DskipTests
+# Then start everything with:             docker compose up --build
+#
+# The MySQL root password comes from MYSQL_ROOT_PASSWORD in your shell or a .env file next to this file.
+# If it is not set, the course default Springboot@530 is used.
+
+services:
+  service-registry:
+    build: ./service-registry
+    container_name: service-registry
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    restart: on-failure
+
+  student-db:
+    image: mysql:8.0
+    container_name: student-db
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Springboot@530}
+      MYSQL_DATABASE: student_db
+    volumes:
+      - student_db_data:/var/lib/mysql
+      - ./docker/mysql/student-db/init.sql:/docker-entrypoint-initdb.d/01-student-db.sql:ro
+    healthcheck:
+      # 127.0.0.1 forces TCP, so the check only passes once the real server (not the init server) is up
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  student-profile-db:
+    image: mysql:8.0
+    container_name: student-profile-db
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Springboot@530}
+      MYSQL_DATABASE: student_profile_db
+    volumes:
+      - student_profile_db_data:/var/lib/mysql
+      - ./docker/mysql/student-profile-db/init.sql:/docker-entrypoint-initdb.d/01-student-profile-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  student-service:
+    build: ./student-service
+    container_name: student-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Springboot@530}
+    depends_on:
+      student-db:
+        condition: service_healthy
+      service-registry:
+        condition: service_started
+    restart: on-failure
+
+  student-profile-service:
+    build: ./student-profile-service
+    container_name: student-profile-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Springboot@530}
+    depends_on:
+      student-profile-db:
+        condition: service_healthy
+      service-registry:
+        condition: service_started
+    restart: on-failure
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      # host 8085 avoids clashing with anything else on 8080; inside the container the gateway still listens on 8080
+      - "8085:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      service-registry:
+        condition: service_started
+      student-service:
+        condition: service_started
+      student-profile-service:
+        condition: service_started
+    restart: on-failure
+
+volumes:
+  student_db_data:
+  student_profile_db_data:
